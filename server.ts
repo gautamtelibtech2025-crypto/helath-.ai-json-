@@ -88,7 +88,10 @@ app.post("/api/analyze", async (req, res) => {
   - Duration of Symptoms: ${duration || "Not specified"}
   - Narrative Details: ${additionalDetails || "No additional context provided."}
 
-  Examine these symptoms thoroughly. You must return possible conditions matching the symptoms, detailed considerations, appropriate level of severity, treatment choices along with their pros and cons, emergency warning signs (red flags), and explicit guidelines for consulting a real professional doctor.
+  Examine these symptoms thoroughly. 
+  NOTE ON LANGUAGE: Some user-defined symptoms may be entered in Hindi (Devanagari, e.g., 'जोड़ो में दर्द', 'बुखार') or Roman Hinglish (e.g., 'sir dard', 'khansi', 'bukhar', 'vomiting jesa lag raha hai'). Translate and interpret these terms to their accurate clinical English equivalents (e.g., 'sir dard' -> headache, 'khansi' -> cough, 'bukhar' -> fever) before performing the triage classification.
+  
+  You must return possible conditions matching the symptoms, detailed considerations, appropriate level of severity, treatment choices along with their pros and cons, emergency warning signs (red flags), and explicit guidelines for consulting a real professional doctor.
 
   IMPORTANT: As this is an AI tool, you must append a professional triage disclaimer stating that this assessment is strictly for educational guidance and prioritizing symptoms, and does not constitute formal medical diagnosis or standard medical advice.
   `;

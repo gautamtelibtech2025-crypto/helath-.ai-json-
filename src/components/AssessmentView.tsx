@@ -7,19 +7,15 @@ import {
   HealthReport 
 } from '../types';
 import { 
-  Heart, 
   Activity, 
   ShieldAlert, 
-  Sparkles,
   ChevronRight, 
   ChevronLeft, 
   User, 
-  TrendingUp, 
-  Check, 
   BrainCircuit, 
   Info,
-  Clock,
-  BriefcaseMedical
+  Plus,
+  X
 } from 'lucide-react';
 import { playPhysicalClick, playDiagnosticAlert, playAssessmentComplete } from '../utils/audio';
 
@@ -44,6 +40,7 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
   });
 
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [customSymptomText, setCustomSymptomText] = useState('');
   const [duration, setDuration] = useState(DURATION_OPTIONS[1]); // Default to "1 to 3 days"
   const [severity, setSeverity] = useState(5); // Default to moderate (5)
   const [additionalDetails, setAdditionalDetails] = useState('');
@@ -78,7 +75,7 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
   // Run structured client-to-backend API analyze request
   const runDiagnosticAnalysis = async () => {
     if (selectedSymptoms.length === 0) {
-      setErrorMsg("Please select at least one physiological symptom from the diagnostic dashboard to initiate AI Triage.");
+      setErrorMsg("Please select at least one symptom or type inside the custom symptom box to proceed.");
       if (soundEnabled) playDiagnosticAlert();
       return;
     }
@@ -101,7 +98,7 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
       });
 
       if (!response.ok) {
-        throw new Error("Triage processing link temporary drop. Retrying automatically...");
+        throw new Error("Triage API service did not respond. Please try again.");
       }
 
       const data = await response.json();
@@ -125,7 +122,7 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newReport)
       });
-      console.log("Health Report auto-saved to database container status:", saveRes.ok);
+      console.log("Health Report auto-saved status:", saveRes.ok);
 
       if (soundEnabled) {
          playAssessmentComplete();
@@ -135,71 +132,90 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
       
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "Session error occurred. Retrying clinical telemetry process.");
+      setErrorMsg(err.message || "An error occurred during symptom analysis. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const allPrescribedSymptoms = SYMPTOM_CATEGORIES.flatMap(cat => cat.symptoms);
+  const customSymptoms = selectedSymptoms.filter(sym => !allPrescribedSymptoms.includes(sym));
+
+  const handleAddCustomSymptom = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = customSymptomText.trim();
+    if (!trimmed) return;
+    
+    if (soundEnabled) playPhysicalClick();
+    
+    // Avoid duplicates
+    if (!selectedSymptoms.includes(trimmed)) {
+      setSelectedSymptoms(prev => [...prev, trimmed]);
+    }
+    setCustomSymptomText('');
+    setErrorMsg('');
+  };
+
+  const stepsHeaderLabel = (index: number) => {
+    switch(index) {
+      case 1: return "Demographics";
+      case 2: return "Symptoms List";
+      case 3: return "Chronology & Severity";
+      case 4: return "Verification Check";
+      case 5: return "AI Analysis Transit";
+      default: return "";
+    }
+  };
+
   return (
-    <div className="space-y-6" id="assessment-view-wizard">
+    <div className="space-y-6 animate-[fadeIn_0.2s_ease-out]" id="assessment-view-wizard">
       
-      {/* Header glassmorphic step indicator with micro-animations */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#E8F5EB]/60 p-4 rounded-2xl border border-white/80 shadow-inner">
+      {/* Modern High-Contrast Step Flow Navigator */}
+      <div className="bg-slate-55 border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800 tracking-tight font-sans">Health Diagnostic Wizard</h2>
-          <p className="text-xs text-gray-500 mt-1 font-mono font-semibold">
-            STATUS: PIPELINE STEP {step} OF 5 — {
-              step === 1 ? 'PERSONAL DEMOGRAPHICS' :
-              step === 2 ? 'SYMPTOM LOGGING' :
-              step === 3 ? 'INTENSITY & CHRONOLOGY' :
-              step === 4 ? 'PRE-FLIGHT VERIFICATION' : 'AI CORE TRANSIT'
-            }
-          </p>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">Step {step} of 5</span>
+          <h2 className="text-lg font-bold text-slate-900 tracking-tight mt-0.5">{stepsHeaderLabel(step)}</h2>
         </div>
 
-        {/* Tactile LED indicators */}
-        <div className="flex gap-2 bg-[#D1DBD3]/30 p-2 rounded-xl" id="bezel-led-indicators">
-          {[1, 2, 3, 4, 5].map((index) => (
+        {/* Flat clean step indicators */}
+        <div className="flex items-center gap-1.5" id="clean-step-dots">
+          {[1,2,3,4,5].map((index) => (
             <div 
-              key={index} 
-              className={`w-3.5 h-3.5 rounded-full transition-all duration-300 relative ${
-                entry => index === step ? 'animate-pulse scale-110' : ''
-              } ${
-                index < step 
-                  ? 'bg-[#3ECF8E] shadow-[0_0_8px_#3ECF8E,inset_1px_1px_1px_white]' 
-                  : index === step 
-                    ? 'bg-[#3ECF8E] shadow-[0_0_12px_#3ECF8E,inset_1px_1px_2px_white]' 
-                    : 'bg-gray-300 shadow-[inset_1px_1px_1px_rgba(0,0,0,0.15)]'
+              key={index}
+              className={`h-2.5 rounded-full transition-all ${
+                index === step 
+                  ? 'w-8 bg-emerald-600' 
+                  : index < step 
+                    ? 'w-4 bg-emerald-700/60' 
+                    : 'w-2.5 bg-slate-200'
               }`}
-            >
-              <div className="absolute top-0.5 left-0.5 w-1 h-1 bg-white/60 rounded-full"></div>
-            </div>
+            />
           ))}
         </div>
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2 animate-bounce">
-          <ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-center gap-2">
+          <ShieldAlert className="w-4.5 h-4.5 text-red-600 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* STEP 1: Personal Demographic Metrics */}
+      {/* STEP 1: Demographic parameters */}
       {step === 1 && (
-        <div className="space-y-6" id="step-1-personal-info">
-          <div className="bg-white/50 p-6 rounded-3xl border border-white/80 shadow-[inset_1px_1px_3px_rgba(255,255,255,0.7)] space-y-4">
-            <h3 className="text-sm font-bold text-gray-700 tracking-wide uppercase font-mono flex items-center gap-2">
-              <User className="w-4 h-4 text-[#3ECF8E]" />
-              Demographic parameters
+        <div className="space-y-6 animate-[fadeIn_0.15s_ease-out]" id="step-1-personal-info">
+          
+          <div className="p-6 rounded-xl border border-slate-200 bg-white space-y-6">
+            <h3 className="text-xs font-bold text-slate-800 tracking-wider uppercase font-mono flex items-center gap-2 border-b border-slate-100 pb-3">
+              <User className="w-4 h-4 text-emerald-600" />
+              Patient Metrics
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
-              {/* Biological Sex Neumorphic container */}
+              {/* Biological Sex Options */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Biological Sex</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Biological Sex</label>
                 <div className="grid grid-cols-3 gap-2">
                   {['male', 'female', 'other'].map((gender) => (
                     <button
@@ -209,10 +225,10 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                         if (soundEnabled) playPhysicalClick();
                         setPersonalInfo({ ...personalInfo, gender: gender as any });
                       }}
-                      className={`py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`py-2.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border ${
                         personalInfo.gender === gender 
-                          ? 'bg-gradient-to-r from-[#3ECF8E] to-[#2ecc8a] text-white shadow-[inset_-1px_-1px_3px_rgba(0,0,0,0.15),_2px_4px_8px_rgba(62,207,142,0.25)] border-b border-[#31B077]'
-                          : 'bg-white text-gray-600 shadow-[3px_3px_6px_rgba(100,120,105,0.06),-2px_-2px_4px_white] hover:bg-[#F4FFF6] border border-gray-100'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                          : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
                       }`}
                     >
                       {gender}
@@ -223,7 +239,7 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
 
               {/* Age select field */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Age (Years)</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Age (Years)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -231,15 +247,15 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                     max="120"
                     value={personalInfo.age}
                     onChange={(e) => setPersonalInfo({ ...personalInfo, age: e.target.value })}
-                    className="w-full py-3 px-4 rounded-xl bg-white text-gray-800 text-sm font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.04),0_1px_1px_white] border border-gray-100 focus:outline-none focus:border-[#3ECF8E]"
+                    className="w-full py-2.5 px-4 rounded-lg bg-white text-slate-800 text-xs font-bold border border-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   />
-                  <div className="absolute right-3.5 top-3.5 text-xs text-gray-400 font-bold font-mono">Yrs</div>
+                  <div className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold font-mono">YRS</div>
                 </div>
               </div>
 
               {/* Weight Dial */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Body Mass (kg)</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Body Mass (kg)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -247,15 +263,15 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                     max="250"
                     value={personalInfo.weight}
                     onChange={(e) => setPersonalInfo({ ...personalInfo, weight: e.target.value })}
-                    className="w-full py-3 px-4 rounded-xl bg-white text-gray-800 text-sm font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.04),0_1px_1px_white] border border-gray-100 focus:outline-none focus:border-[#3ECF8E]"
+                    className="w-full py-2.5 px-4 rounded-lg bg-white text-slate-800 text-xs font-bold border border-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   />
-                  <div className="absolute right-3.5 top-3.5 text-xs text-gray-400 font-bold font-mono">KG</div>
+                  <div className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold font-mono">KG</div>
                 </div>
               </div>
 
               {/* Height Dial */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Height (cm)</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Height (cm)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -263,9 +279,9 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                     max="250"
                     value={personalInfo.height}
                     onChange={(e) => setPersonalInfo({ ...personalInfo, height: e.target.value })}
-                    className="w-full py-3 px-4 rounded-xl bg-white text-gray-800 text-sm font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.04),0_1px_1px_white] border border-gray-100 focus:outline-none focus:border-[#3ECF8E]"
+                    className="w-full py-2.5 px-4 rounded-lg bg-white text-slate-800 text-xs font-bold border border-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   />
-                  <div className="absolute right-3.5 top-3.5 text-xs text-gray-400 font-bold font-mono">CM</div>
+                  <div className="absolute right-3 top-3 text-[10px] text-slate-400 font-bold font-mono">CM</div>
                 </div>
               </div>
 
@@ -273,86 +289,154 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
 
             {/* Existing conditions input bar */}
             <div className="space-y-2 pt-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1 block">Known Metabolic, Cardiac or Respiratory conditions (Optional)</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Known Medical/Chronic Conditions (Optional)</label>
               <textarea
                 value={personalInfo.existingConditions}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, existingConditions: e.target.value })}
-                placeholder="Prescribed hypertension medication, allergies to penicillin, previous history of asthma..."
+                placeholder="List pre-existing conditions (e.g., Asthma, Hypertension, Drug allergies)..."
                 rows={3}
-                className="w-full p-4 rounded-xl bg-white text-gray-800 text-sm font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.04),0_1px_1px_white] border border-gray-100 focus:outline-none focus:border-[#3ECF8E] placeholder:text-gray-400 leading-relaxed font-sans"
+                className="w-full p-3.5 rounded-lg bg-white text-slate-800 text-xs font-semibold border border-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 placeholder:text-slate-400 leading-relaxed font-sans"
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 2: Multi-Category Symptoms Selection (Skeuomorphic tactile chips) */}
+      {/* STEP 2: Multi-Category Symptoms Selection */}
       {step === 2 && (
-        <div className="space-y-6" id="step-2-symptoms">
+        <div className="space-y-6 animate-[fadeIn_0.15s_ease-out]" id="step-2-symptoms">
           
-          <div className="bg-white/40 p-5 rounded-3xl border border-white/80 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-700 tracking-wide uppercase font-mono mb-4 flex items-center gap-2">
-              <BriefcaseMedical className="w-4 h-4 text-[#3ECF8E]" />
-              Select active clinical indicators ({selectedSymptoms.length} selected)
-            </h3>
+          <div className="p-6 rounded-xl border border-slate-200 bg-white space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-xs font-bold text-slate-800 tracking-wider uppercase font-mono">
+                Select Active Symptoms ({selectedSymptoms.length} selected)
+              </h3>
+            </div>
 
-            {/* Iterate over diagnostic symptom categories defined in types */}
+            {/* Symptom grids */}
             <div className="space-y-6" id="symptoms-list-deck">
               {SYMPTOM_CATEGORIES.map((cat) => (
-                <div key={cat.id} className="bg-[#EAF3EB]/30 p-4 rounded-2xl border border-white/60 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.7)]">
-                  <span className="text-xs font-bold text-gray-600 block uppercase tracking-widest font-mono mb-2.5">{cat.name} System</span>
+                <div key={cat.id} className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider font-mono mb-3">{cat.name} Symptoms</span>
                   
-                  <div className="flex flex-wrap gap-2.5">
+                  <div className="flex flex-wrap gap-2">
                     {cat.symptoms.map((sym) => {
                       const isSelected = selectedSymptoms.includes(sym);
                       return (
-                        <div
+                        <button
                           key={sym}
+                          type="button"
                           onClick={() => toggleSymptom(sym)}
-                          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all duration-300 transform select-none ${
+                          className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all select-none border cursor-pointer flex items-center gap-1.5 ${
                             isSelected 
-                              ? 'bg-gradient-to-b from-white to-[#F0FFF4] text-[#22C55E] shadow-[4px_4px_8px_#c2d1c6,-2px_-2px_6px_#ffffff] border-2 border-[#3ECF8E]' 
-                              : 'bg-white text-gray-500 shadow-[2px_2px_5px_rgba(100,120,105,0.06),-1px_-1px_3px_white] hover:text-gray-800 border border-gray-100'
+                              ? 'bg-emerald-600 text-white border-emerald-600' 
+                              : 'bg-white text-slate-700 hover:text-slate-950 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
                           <span>{sym}</span>
-                          {isSelected && (
-                            <div className="w-4 h-4 rounded-full bg-[#3ECF8E] flex items-center justify-center text-white text-[9px] font-bold shadow-sm">
-                              ✓
-                            </div>
-                          )}
-                        </div>
+                          {isSelected && <span className="text-[9px]">✓</span>}
+                        </button>
                       );
                     })}
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Custom / Hindi Symptom Input Box (आपके लिखे हुए लक्षण) */}
+            <div className="p-5 bg-slate-50 rounded-lg border border-slate-200 space-y-4" id="custom-symptom-input-block">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block">
+                    लिखकर लक्षण बताएं / type custom symptom
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    यदि आपके लक्षण ऊपर दी सूची में नहीं हैं, तो उन्हें यहाँ हिंदी (जैसे: 'sir dard') या English में लिखकर जोड़ें।
+                  </p>
+                </div>
+                <span className="text-[9px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded uppercase font-mono tracking-wider">
+                  Hindi & English Support
+                </span>
+              </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customSymptomText}
+                  onChange={(e) => setCustomSymptomText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddCustomSymptom();
+                    }
+                  }}
+                  placeholder="यहाँ लक्षण लिखें (उदा: 'khansi', 'bukhar', 'stomach infection', 'वजन घटना')"
+                  className="flex-1 py-2.5 px-3.5 rounded-lg bg-white text-slate-800 text-xs font-semibold border border-slate-200 focus:outline-none focus:border-emerald-600 placeholder:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddCustomSymptom()}
+                  className="px-4 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add (जोड़ें)</span>
+                </button>
+              </div>
+
+              {/* Render Custom Symptoms list */}
+              {customSymptoms.length > 0 && (
+                <div className="pt-2.5 border-t border-dashed border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 font-mono block uppercase mb-2">
+                    आपके जोड़े हुए लक्षण / Custom Symptoms ({customSymptoms.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {customSymptoms.map((sym) => (
+                      <div
+                        key={sym}
+                        className="px-2.5 py-1.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-250 text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <span>{sym}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (soundEnabled) playDiagnosticAlert();
+                            setSelectedSymptoms(prev => prev.filter(s => s !== sym));
+                          }}
+                          className="text-emerald-700 hover:text-red-500 cursor-pointer shrink-0"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>
       )}
 
-      {/* STEP 3: Intensity, Severity sliders and Chronology selection */}
+      {/* STEP 3: Intensity & Chronology */}
       {step === 3 && (
-        <div className="space-y-6" id="step-3-severity">
-          <div className="bg-white/50 p-6 rounded-3xl border border-white/80 shadow-sm space-y-6">
+        <div className="space-y-6 animate-[fadeIn_0.15s_ease-out]" id="step-3-severity">
+          <div className="p-6 rounded-xl border border-slate-200 bg-white space-y-6">
             
-            {/* Dynamic Severity Gauge Area */}
+            {/* Severity Gauge */}
             <div className="space-y-3">
-              <div className="flex justify-between items-center ml-1">
-                <label className="text-xs font-bold text-gray-600 uppercase tracking-widest font-mono">SUBJECTIVE SEVERITY GAUGE</label>
-                <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
-                  severity <= 3 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-                  severity <= 7 ? 'bg-amber-50 text-amber-600 border border-amber-200 animate-pulse' :
-                  'bg-red-50 text-red-600 border border-red-200 animate-[bounce_1.5s_infinite]'
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono">Subjective Severity Index</label>
+                <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                  severity <= 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                  severity <= 7 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  'bg-red-50 text-red-700 border-red-200'
                 }`}>
-                  {severity} / 10 - {severity <= 3 ? 'Mild Condition' : severity <= 7 ? 'Moderate Status' : 'Severe Alarm'}
+                  {severity} / 10 &bull; {severity <= 3 ? 'Mild Presentation' : severity <= 7 ? 'Moderate presentation' : 'Severe Alarm'}
                 </span>
               </div>
 
-              {/* Heavy Neumorphic Tactile Slider Channel */}
-              <div className="p-4 bg-[#EDF3EE] rounded-2xl border border-gray-200 shadow-[inset_2px_2px_5px_rgba(0,0,0,0.05),_inset_-2px_-2px_5px_white] relative">
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <input 
                   type="range" 
                   min="1" 
@@ -363,20 +447,20 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                     setSeverity(parseInt(e.target.value));
                     setErrorMsg('');
                   }}
-                  className="w-full h-3 accent-[#3ECF8E] rounded-full cursor-col-resize shadow-inner border border-gray-300" 
+                  className="w-full h-1.5 accent-emerald-600 cursor-col-resize fill-emerald-600 rounded-lg" 
                 />
-                <div className="flex justify-between text-[10px] text-gray-500 font-mono font-bold mt-2 px-1">
+                <div className="flex justify-between text-[9px] text-slate-450 font-mono mt-2">
                   <span>1 (Inconsequential)</span>
                   <span>5 (Interfering)</span>
-                  <span>10 (Debilitating)</span>
+                  <span>10 (Severe distress)</span>
                 </div>
               </div>
             </div>
 
-            {/* Chronological representation block */}
+            {/* Duration select */}
             <div className="space-y-3 pt-2">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-widest font-mono block ml-1">DURATION OF MANIFESTATION</label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2" id="duration-grid">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono block">Symptoms Duration</label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" id="duration-grid">
                 {DURATION_OPTIONS.map((opt) => (
                   <button
                     key={opt}
@@ -384,10 +468,10 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                       if (soundEnabled) playPhysicalClick();
                       setDuration(opt);
                     }}
-                    className={`py-3.5 px-2 rounded-xl text-xs font-bold text-center tracking-tighter cursor-pointer border transition-all duration-200 ${
+                    className={`py-2.5 px-2 rounded-lg text-xs font-bold text-center capitalize cursor-pointer border transition-all ${
                       duration === opt 
-                        ? 'bg-[#3ECF8E]/10 text-emerald-700 border-2 border-[#3ECF8E] shadow-[inset_1px_1px_3px_white]' 
-                        : 'bg-white hover:bg-gray-100 text-gray-500 border-gray-200'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                        : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
                     }`}
                   >
                     {opt}
@@ -396,18 +480,18 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
               </div>
             </div>
 
-            {/* Additional details free form text-area */}
+            {/* Additional narrative */}
             <div className="space-y-3 pt-2">
-              <label className="text-xs font-bold text-gray-600 uppercase tracking-widest font-mono block ml-1 flex items-center gap-1">
-                <Info className="w-3.5 h-3.5 text-gray-400" />
-                SENSORY TIMELINE DESCRIPTION (SUBJECTIVE PERSPECTIVE)
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono block flex items-center gap-1">
+                <Info className="w-3.5 h-3.5 text-slate-400" />
+                Additional Presentation Details (Context)
               </label>
               <textarea
                 value={additionalDetails}
                 onChange={(e) => setAdditionalDetails(e.target.value)}
-                placeholder="The cough feels worse during night hours. Stinging tension spreads around the shoulder bone. Rest and hydration slightly mitigate presentation..."
+                placeholder="Give more context about your condition (e.g., 'Cough gets worse at night', 'sir dard subah zyada lagta hai')..."
                 rows={3}
-                className="w-full p-4 rounded-xl bg-white text-gray-800 text-sm font-semibold shadow-[inset_2px_2px_4px_rgba(0,0,0,0.04),0_1px_1px_white] border border-gray-100 focus:outline-none focus:border-[#3ECF8E] placeholder:text-gray-400 font-sans"
+                className="w-full p-3.5 rounded-lg bg-white text-xs font-semibold border border-slate-200 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 placeholder:text-slate-400 leading-relaxed font-sans"
               />
             </div>
 
@@ -415,44 +499,44 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
         </div>
       )}
 
-      {/* STEP 4: Review and Verify entered details */}
+      {/* STEP 4: Review */}
       {step === 4 && (
-        <div className="space-y-6" id="step-4-review">
-          <div className="bg-white/50 p-6 rounded-3xl border border-white/80 shadow-sm space-y-6">
+        <div className="space-y-6 animate-[fadeIn_0.15s_ease-out]" id="step-4-review">
+          <div className="p-6 rounded-xl border border-slate-200 bg-white space-y-6">
             
-            <h3 className="text-md font-bold text-gray-800 tracking-wide font-sans border-b border-gray-200/60 pb-3">
-              PRE-FLIGHT DIAGNOSTICS LOG REVIEW
+            <h3 className="text-sm font-bold text-slate-800 tracking-wider font-mono border-b border-slate-100 pb-3 uppercase">
+              Assessment Summary Verification
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5" id="review-metrics-panel">
               
-              <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100/60 flex flex-col justify-between">
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 flex flex-col justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 font-mono block uppercase">Physiological Metrics</span>
-                  <div className="space-y-1.5 mt-2.5">
-                    <div className="text-xs text-gray-600">Age parameter: <b className="text-gray-800 font-extrabold">{personalInfo.age} Yrs</b></div>
-                    <div className="text-xs text-gray-600">Biological Sex: <b className="text-gray-800 font-extrabold uppercase">{personalInfo.gender || 'N/A'}</b></div>
-                    <div className="text-xs text-gray-600">Patient weight check: <b className="text-gray-800 font-extrabold">{personalInfo.weight} KG</b></div>
-                    <div className="text-xs text-gray-600">Patient height index: <b className="text-gray-800 font-extrabold">{personalInfo.height} CM</b></div>
+                  <span className="text-[10px] font-bold text-slate-450 font-mono block uppercase">Patient Biometrics</span>
+                  <div className="space-y-1.5 mt-3">
+                    <div className="text-xs text-slate-600">Age parameter: <b className="text-slate-800">{personalInfo.age} Yrs</b></div>
+                    <div className="text-xs text-slate-600">Biological Sex: <b className="text-slate-800 uppercase">{personalInfo.gender || 'N/A'}</b></div>
+                    <div className="text-xs text-slate-600">Patient weight check: <b className="text-slate-800">{personalInfo.weight} KG</b></div>
+                    <div className="text-xs text-slate-600">Patient height index: <b className="text-slate-800">{personalInfo.height} CM</b></div>
                   </div>
                 </div>
                 <button 
                   onClick={() => setStep(1)} 
-                  className="text-xs text-left text-emerald-600 hover:underline mt-4 font-bold"
+                  className="text-xs text-left text-emerald-600 hover:text-emerald-700 mt-4 font-bold"
                 >
                   Edit demographic data &rarr;
                 </button>
               </div>
 
-              <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100/60 flex flex-col justify-between">
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 flex flex-col justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 font-mono block uppercase">Active Symptoms List</span>
+                  <span className="text-[10px] font-bold text-slate-450 font-mono block uppercase">Active Symptoms</span>
                   {selectedSymptoms.length === 0 ? (
                     <span className="text-xs text-red-500 font-semibold block mt-4">NO SYMPTOMS SELECTED!</span>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    <div className="flex flex-wrap gap-1.5 mt-3">
                       {selectedSymptoms.map((sym) => (
-                        <span key={sym} className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-[#3ECF8E] border border-emerald-100/60 rounded-md">
+                        <span key={sym} className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded">
                           {sym}
                         </span>
                       ))}
@@ -461,7 +545,7 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
                 </div>
                 <button 
                   onClick={() => setStep(2)} 
-                  className="text-xs text-left text-emerald-600 hover:underline mt-4 font-bold"
+                  className="text-xs text-left text-emerald-600 hover:text-emerald-700 mt-4 font-bold"
                 >
                   Modify symptoms &rarr;
                 </button>
@@ -469,82 +553,67 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
 
             </div>
 
-            <div className="p-4 bg-[#EDF3EE]/40 rounded-2xl border border-dashed border-gray-300">
-              <span className="text-[10px] font-bold text-gray-500 font-mono block uppercase">CHRONOLOGICAL PROFILE</span>
+            <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <span className="text-[10px] font-bold text-slate-450 font-mono block uppercase">CHRONOLOGICAL PROFILE</span>
               <div className="flex flex-wrap gap-4 mt-2">
-                <div className="text-xs text-gray-600">Symptom Duration: <b className="text-gray-800 font-mono font-bold text-emerald-600">{duration}</b></div>
-                <div className="text-xs text-gray-600">Grave Severity Intensity: <b className="text-gray-800 font-mono font-bold text-emerald-600">{severity} / 10</b></div>
+                <div className="text-xs text-slate-600">Symptom Duration: <b className="text-slate-805 text-emerald-600 font-bold">{duration}</b></div>
+                <div className="text-xs text-slate-600">Systemic Severity Impact: <b className="text-slate-805 text-emerald-600 font-bold">{severity} / 10</b></div>
               </div>
               {additionalDetails && (
-                <div className="text-xs text-gray-500 mt-2.5 border-t border-gray-200/50 pt-2 bg-white/30 p-2 rounded">
-                  {additionalDetails}
+                <div className="text-xs text-slate-500 mt-3 border-t border-slate-150 pt-3 italic">
+                  "{additionalDetails}"
                 </div>
               )}
             </div>
 
-            <p className="text-[10px] text-gray-400 leading-relaxed font-sans mt-2.5">
-              Attention operator: This triage simulation system connects with Google AI Studio backend pipelines. Click on "LAUNCH AI TRIAGE ENGINES" to proceed to parsing analysis.
+            <p className="text-[11px] text-slate-500 leading-relaxed font-sans mt-2">
+              All entered parameters have been populated cleanly. Proceed below to execute the AI evaluation model.
             </p>
 
           </div>
         </div>
       )}
 
-      {/* STEP 5: Launch AI Analysis progress and triggers */}
+      {/* STEP 5: Run AI Analysis */}
       {step === 5 && (
-        <div className="space-y-6" id="step-5-assess">
-          <div className="bg-white/50 p-6 rounded-3xl border border-white/80 shadow-sm text-center py-12 relative overflow-hidden">
+        <div className="space-y-6 animate-[fadeIn_0.15s_ease-out]" id="step-5-assess">
+          <div className="p-8 rounded-xl border border-slate-200 bg-white text-center py-12 relative overflow-hidden">
             
-            <div className="absolute top-0 left-0 w-full h-[5px] bg-gradient-to-r from-emerald-400 via-teal-400 to-[#3ECF8E] animate-pulse"></div>
-
             {!loading ? (
               <div className="max-w-md mx-auto space-y-6">
                 
-                {/* 3D Circular Pulse Sensor ring */}
-                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-[#3ECF8E] to-[#22C55E] flex items-center justify-center shadow-[
-                  0_8px_20px_rgba(62,207,142,0.4),
-                  inset_1px_2px_3px_rgba(255,255,255,0.4)
-                ] border border-[#2b9163]/50 animate-bounce">
-                  <BrainCircuit className="w-11 h-11 text-white animate-pulse" />
+                <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                  <BrainCircuit className="w-8 h-8" />
                 </div>
 
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold font-sans text-gray-800">Cores Primed & Ready</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed max-w-sm mx-auto">
-                    Demographic indicators and symptom arrays have passed standard pre-flight sanitization check-lists. Telemetry transit lanes are stable.
+                  <h3 className="text-lg font-bold text-slate-900">Demographic & Symptoms Primed</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                    Your parameters are formatted correctly. Send this information to the secure clinical generative engine to find probable evaluations and clinical warning signs.
                   </p>
                 </div>
 
-                {/* SKEUOMORPHIC SHINY LAUNCH BUTTON */}
                 <button
                   type="button"
                   onClick={runDiagnosticAnalysis}
-                  className="px-8 py-4.5 rounded-2xl bg-gradient-to-b from-[#3ECF8E] via-[#2ebd8a] to-[#22C55E] text-white text-base font-black tracking-widest uppercase hover:scale-[1.01] transition-all cursor-pointer shadow-[
-                    0_8px_0_#1b925c,
-                    0_15px_30px_rgba(62,207,142,0.35),
-                    inset_1.5px_2px_3px_rgba(255,255,255,0.45)
-                  ] active:translate-y-2 active:shadow-[0_2px_0_#1b925c,0_4px_10px_rgba(62,207,142,0.35)] active:scale-100 block w-full border border-[#1FA067]"
+                  className="w-full px-6 py-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs uppercase font-extrabold tracking-widest cursor-pointer shadow-sm transition-all"
                 >
-                  ⚡ LAUNCH AI TRIAGE ENGINES ⚡
+                  Launch AI Triage Analysis
                 </button>
                 
               </div>
             ) : (
               <div className="max-w-md mx-auto space-y-6 py-6 animate-pulse">
                 
-                {/* Loading diagnostic signal loop */}
-                <div className="relative w-20 h-20 mx-auto">
-                  <div className="absolute inset-0 rounded-full border-4 border-emerald-500/10"></div>
-                  <div className="absolute inset-0 rounded-full border-4 border-t-[#3ECF8E] border-r-transparent animate-spin"></div>
+                <div className="relative w-12 h-12 mx-auto">
+                  <div className="absolute inset-0 rounded-full border-2 border-slate-100"></div>
+                  <div className="absolute inset-0 rounded-full border-2 border-t-emerald-600 border-r-transparent animate-spin"></div>
                 </div>
 
-                <div className="space-y-2.5">
-                  <h4 className="text-md font-bold text-gray-700 tracking-wide uppercase font-mono">DETERMINING PROBABILITY FIELDS</h4>
-                  <div className="w-48 h-1 px-1 bg-gray-100 rounded-full mx-auto overflow-hidden relative">
-                    <div className="absolute left-0 top-0 h-full w-4/5 bg-gradient-to-r from-[#3ECF8E] via-[#6EE7B7] to-emerald-500 animate-[pulse_1s_infinite]"></div>
-                  </div>
-                  <p className="text-[10px] text-gray-400 font-mono uppercase tracking-widest animate-pulse mt-2 block">
-                    Securing Gemini clinical model reasoning pathways...
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-600 uppercase tracking-widest font-mono">Analyzing Symptoms...</h4>
+                  <p className="text-[11px] text-slate-450">
+                    Sifting medical considerations. Checking red flags. Preparing educational report...
                   </p>
                 </div>
 
@@ -555,26 +624,26 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
         </div>
       )}
 
-      {/* FOOTER MULTI-STEP NAVIGATION BAR */}
-      <div className="flex justify-between items-center bg-[#E8F5EB]/20 p-4 rounded-2xl border border-white/60">
+      {/* FOOTER WIZARD NAV BAR */}
+      <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
         
         {/* Previous */}
         <button
           onClick={prevStep}
           disabled={step === 1 || loading}
-          className={`px-6 py-3 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition-all ${
+          className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all ${
             step === 1 || loading
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-inner'
-              : 'bg-white text-gray-600 hover:text-emerald-700 shadow-[2px_3px_6px_#c2d1c6,-2px_-2px_6px_white] hover:scale-101 border border-gray-100'
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm'
           }`}
         >
-          <ChevronLeft className="w-4.5 h-4.5" />
-          <span>Previous</span>
+          <ChevronLeft className="w-4 h-4" />
+          <span>Previous Step</span>
         </button>
 
-        {/* Diagnostic info placeholder */}
-        <span className="hidden sm:inline-block text-[11px] text-emerald-700 font-bold tracking-widest font-mono">
-          SECURE STACK V4.2
+        {/* Info */}
+        <span className="hidden sm:inline-block text-[10px] text-slate-450 font-bold uppercase tracking-wider font-mono">
+          Secure AI Assessment
         </span>
 
         {/* Next Step */}
@@ -582,13 +651,13 @@ export default function AssessmentView({ soundEnabled, onAnalysisSuccess, goToTa
           <button
             onClick={nextStep}
             disabled={loading}
-            className="px-6 py-3 rounded-xl bg-white text-emerald-800 font-bold tracking-wide flex items-center gap-1 hover:scale-101 hover:text-[#3ECF8E] transition-all cursor-pointer shadow-[2px_3px_6px_#c2d1c6,-2px_-2px_6px_white] border border-[#3ECF8E]/20"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-950 text-white rounded-lg text-xs font-bold tracking-wide flex items-center gap-1 transition-all cursor-pointer shadow-sm"
           >
             <span>Next Step</span>
-            <ChevronRight className="w-4.5 h-4.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         ) : (
-          <div className="w-2.5 h-2.5 bg-[#3ECF8E] rounded-full animate-ping"></div>
+          <div className="w-2 h-2 bg-emerald-650 rounded-full animate-ping"></div>
         )}
 
       </div>
