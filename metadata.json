@@ -1,0 +1,6 @@
+{
+  "name": "HealthAI",
+  "description": "An AI-powered Health Assessment Assistant with a premium skeuomorphic 3D medical interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
